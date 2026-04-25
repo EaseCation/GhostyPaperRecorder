@@ -1,0 +1,2 @@
+# Output files are written to plugins/GhostyPaperRecorder/records by default.
+# This MVP intentionally records only players and successful player-vs-player hits.

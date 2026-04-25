@@ -1,0 +1,15 @@
+name: GhostyPaperRecorder
+version: ${version}
+main: net.easecation.ghostypaperrecorder.GhostyPaperRecorderPlugin
+api-version: '1.21'
+author: EaseCation
+description: Paper-side PvP recorder that writes Ghosty-compatible replay packs.
+commands:
+  ghostyrecord:
+    description: Start or stop Ghosty-compatible PvP recording.
+    usage: /ghostyrecord <start <name>|stop|status>
+    permission: ghostypaperrecorder.command
+permissions:
+  ghostypaperrecorder.command:
+    description: Allows controlling Ghosty Paper recording.
+    default: op
