@@ -7,7 +7,7 @@ description: Paper-side PvP recorder that writes Ghosty-compatible replay packs.
 commands:
   ghostyrecord:
     description: Start or stop Ghosty-compatible PvP recording.
-    usage: /ghostyrecord <start <name>|stop|status>
+    usage: /ghostyrecord <start <recordName>|start <sessionId> <recordName>|stop [sessionId]|status [sessionId]>
     permission: ghostypaperrecorder.command
 permissions:
   ghostypaperrecorder.command:

@@ -1,9 +1,11 @@
 package net.easecation.ghostypaperrecorder.recording;
 
+import net.easecation.ghostypaperrecorder.api.RecordingMetadata;
+import net.easecation.ghostypaperrecorder.api.RecordingPlayerInfo;
+import net.easecation.ghostypaperrecorder.api.RecordingStatus;
+import net.easecation.ghostypaperrecorder.api.RecordingStopResult;
 import net.easecation.ghostypaperrecorder.format.GhostyBinaryWriter;
 import net.easecation.ghostypaperrecorder.format.GhostyPackWriter;
-import net.easecation.ghostypaperrecorder.model.PlaybackMetadata;
-import net.easecation.ghostypaperrecorder.model.PlayerInfo;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Chicken;
@@ -21,9 +23,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 
 public final class RecordingSession {
@@ -35,30 +39,39 @@ public final class RecordingSession {
     private static final int FLAG_SWIMMING = 56;
     private static final int ANIMATE_SWING_ARM = 1;
 
-    private final Plugin plugin;
     private final PaperItemMapper itemMapper;
     private final GhostyPackWriter packWriter;
+    private final String sessionId;
     private final Path outputFile;
     private final String recordName;
+    private final Set<UUID> participants;
     private final Map<UUID, PlayerRecording> players = new LinkedHashMap<>();
     private final EntityIdMapper entityIdMapper = new EntityIdMapper();
-    private final List<PlayerInfo> playerInfo = new ArrayList<>();
     private final BukkitTask task;
+    private RecordingMetadata metadata;
     private String worldName = "paper";
     private int tick = 0;
     private boolean stopped = false;
+    private RecordingStopResult stopResult;
 
-    public RecordingSession(Plugin plugin, PaperItemMapper itemMapper, GhostyPackWriter packWriter, Path outputFile, String recordName) {
-        this.plugin = plugin;
+    public RecordingSession(Plugin plugin, PaperItemMapper itemMapper, GhostyPackWriter packWriter, String sessionId,
+                            Path outputFile, String recordName, Set<UUID> participants, RecordingMetadata metadata) {
         this.itemMapper = itemMapper;
         this.packWriter = packWriter;
+        this.sessionId = sessionId;
         this.outputFile = outputFile;
         this.recordName = recordName;
+        this.participants = new LinkedHashSet<>(participants);
+        this.metadata = metadata;
         this.task = Bukkit.getScheduler().runTaskTimer(plugin, this::recordTick, 1L, 1L);
     }
 
     public void recordTick() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        for (UUID participant : participants) {
+            Player player = Bukkit.getPlayer(participant);
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
             World world = player.getWorld();
             worldName = world.getName();
             playerRecording(player).record(tick, snapshot(player));
@@ -67,14 +80,14 @@ public final class RecordingSession {
     }
 
     public void recordSwing(Player player) {
-        if (stopped) {
+        if (stopped || !isParticipant(player)) {
             return;
         }
         playerRecording(player).recordAnimate(tick, ANIMATE_SWING_ARM, 0.0f);
     }
 
     public void recordAttack(Player attacker, Entity target) {
-        if (stopped) {
+        if (stopped || !isParticipant(attacker)) {
             return;
         }
         OptionalLong targetId = targetEntityId(target);
@@ -84,19 +97,41 @@ public final class RecordingSession {
         playerRecording(attacker).recordAttack(tick, targetId.getAsLong());
     }
 
-    public Path stopAndSave() throws IOException {
+    public RecordingStopResult stopAndSave() throws IOException {
         if (stopped) {
-            return outputFile;
+            return stopResult;
         }
         stopped = true;
         task.cancel();
         forceFinalSnapshots();
         Files.createDirectories(outputFile.getParent());
-        PlaybackMetadata metadata = PlaybackMetadata.create(recordName, worldName, playerInfo);
+        List<String> recordedNames = recordedPlayerNames();
+        RecordingMetadata finalMetadata = finalMetadata(recordedNames);
         try (OutputStream outputStream = Files.newOutputStream(outputFile)) {
-            packWriter.write(outputStream, Math.max(1, tick), players.values(), metadata);
+            packWriter.write(outputStream, Math.max(1, tick), players.values(), finalMetadata);
         }
-        return outputFile;
+        stopResult = new RecordingStopResult(sessionId, recordName, outputFile, Math.max(1, tick), recordedNames, finalMetadata);
+        return stopResult;
+    }
+
+    public RecordingStatus status() {
+        return new RecordingStatus(sessionId, recordName, outputFile, tick, players.size(), participants);
+    }
+
+    public void setMetadata(RecordingMetadata metadata) {
+        this.metadata = metadata;
+    }
+
+    public void mergeMetadata(RecordingMetadata metadata) {
+        if (metadata == null) {
+            return;
+        }
+        RecordingMetadata base = this.metadata == null ? defaultMetadata(List.of()) : this.metadata;
+        this.metadata = base.mergePreferNew(metadata);
+    }
+
+    public boolean containsParticipant(UUID uuid) {
+        return participants.contains(uuid);
     }
 
     public int tick() {
@@ -119,13 +154,33 @@ public final class RecordingSession {
         return outputFile;
     }
 
+    public String sessionId() {
+        return sessionId;
+    }
+
+    public String recordName() {
+        return recordName;
+    }
+
+    public Set<UUID> participants() {
+        return Set.copyOf(participants);
+    }
+
+    public RecordingMetadata metadata() {
+        return metadata;
+    }
+
     long mappedEntityIdForTest(Entity entity) {
         return nonPlayerEntityId(entity);
     }
 
     private void forceFinalSnapshots() {
         int finalTick = Math.max(1, tick);
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        for (UUID participant : participants) {
+            Player player = Bukkit.getPlayer(participant);
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
             PlayerRecording recording = players.get(player.getUniqueId());
             if (recording != null) {
                 recording.forceRecord(finalTick, snapshot(player));
@@ -133,8 +188,36 @@ public final class RecordingSession {
         }
     }
 
+    private RecordingMetadata finalMetadata(List<String> recordedNames) {
+        RecordingMetadata effective = metadata == null ? defaultMetadata(defaultPlayerInfo(recordedNames)) : metadata;
+        return effective.filterAndFillPlayers(recordedNames);
+    }
+
+    private RecordingMetadata defaultMetadata(List<RecordingPlayerInfo> players) {
+        return RecordingMetadata.createDefault(recordName, worldName, players);
+    }
+
+    private List<RecordingPlayerInfo> defaultPlayerInfo(List<String> recordedNames) {
+        List<RecordingPlayerInfo> result = new ArrayList<>();
+        for (String name : recordedNames) {
+            result.add(RecordingPlayerInfo.of(name, name));
+        }
+        return result;
+    }
+
+    private List<String> recordedPlayerNames() {
+        List<String> names = new ArrayList<>();
+        for (PlayerRecording player : players.values()) {
+            names.add(player.playerName());
+        }
+        return List.copyOf(names);
+    }
+
     private OptionalLong targetEntityId(Entity entity) {
         if (entity instanceof Player player) {
+            if (!isParticipant(player)) {
+                return OptionalLong.empty();
+            }
             return OptionalLong.of(playerRecording(player).originEntityId());
         }
         if (entity instanceof Chicken || entity instanceof Sheep) {
@@ -147,11 +230,12 @@ public final class RecordingSession {
         return entityIdMapper.id(entity.getUniqueId());
     }
 
+    private boolean isParticipant(Player player) {
+        return participants.contains(player.getUniqueId());
+    }
+
     private PlayerRecording playerRecording(Player player) {
-        return players.computeIfAbsent(player.getUniqueId(), uuid -> {
-            playerInfo.add(PlayerInfo.of(player.getName(), player.getName()));
-            return new PlayerRecording(player.getName(), GhostyBinaryWriter.stableEntityId(uuid), 0);
-        });
+        return players.computeIfAbsent(player.getUniqueId(), uuid -> new PlayerRecording(player.getName(), GhostyBinaryWriter.stableEntityId(uuid), 0));
     }
 
     private PlayerSnapshot snapshot(Player player) {

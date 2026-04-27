@@ -1,6 +1,6 @@
 package net.easecation.ghostypaperrecorder.format;
 
-import net.easecation.ghostypaperrecorder.model.PlaybackMetadata;
+import net.easecation.ghostypaperrecorder.api.RecordingMetadata;
 import net.easecation.ghostypaperrecorder.recording.PlayerRecording;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -15,7 +15,7 @@ public final class GhostyPackWriter {
     private final GhostyRecordWriter recordWriter = new GhostyRecordWriter();
     private final JsonUtil jsonUtil = new JsonUtil();
 
-    public void write(OutputStream outputStream, int lastTick, Collection<PlayerRecording> players, PlaybackMetadata metadata) throws IOException {
+    public void write(OutputStream outputStream, int lastTick, Collection<PlayerRecording> players, RecordingMetadata metadata) throws IOException {
         try (TarArchiveOutputStream tar = new TarArchiveOutputStream(new ZstdCompressorOutputStream(outputStream, 19))) {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             insert(tar, "level_record.ecrecl", recordWriter.writeLevelRecord(lastTick));

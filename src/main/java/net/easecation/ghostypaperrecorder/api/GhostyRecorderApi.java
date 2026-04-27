@@ -1,0 +1,20 @@
+package net.easecation.ghostypaperrecorder.api;
+
+import java.io.IOException;
+import java.util.Collection;
+
+public interface GhostyRecorderApi {
+    RecordingStatus startRecording(RecordingStartRequest request) throws IOException;
+
+    RecordingStopResult stopRecording(String sessionId) throws IOException;
+
+    RecordingStatus status(String sessionId);
+
+    Collection<RecordingStatus> activeSessions();
+
+    boolean isRecording(String sessionId);
+
+    void setMetadata(String sessionId, RecordingMetadata metadata);
+
+    void mergeMetadata(String sessionId, RecordingMetadata metadata);
+}

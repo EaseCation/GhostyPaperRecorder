@@ -1,7 +1,7 @@
 package net.easecation.ghostypaperrecorder.format;
 
-import net.easecation.ghostypaperrecorder.model.PlaybackMetadata;
-import net.easecation.ghostypaperrecorder.model.PlayerInfo;
+import net.easecation.ghostypaperrecorder.api.RecordingMetadata;
+import net.easecation.ghostypaperrecorder.api.RecordingPlayerInfo;
 import net.easecation.ghostypaperrecorder.recording.PlayerRecording;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream;
@@ -20,7 +20,7 @@ class GhostyPackWriterTest {
     void writesRequiredGhostyPackEntries() throws Exception {
         GhostyPackWriter packWriter = new GhostyPackWriter();
         PlayerRecording player = new PlayerRecording("Steve", 123L, 0);
-        PlaybackMetadata metadata = PlaybackMetadata.create("test", "world", List.of(PlayerInfo.of("Steve", "Steve")));
+        RecordingMetadata metadata = RecordingMetadata.createDefault("test", "world", List.of(RecordingPlayerInfo.of("Steve", "Steve")));
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
         packWriter.write(outputStream, 20, List.of(player), metadata);
