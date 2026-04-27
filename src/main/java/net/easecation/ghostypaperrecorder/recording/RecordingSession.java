@@ -6,7 +6,10 @@ import net.easecation.ghostypaperrecorder.model.PlaybackMetadata;
 import net.easecation.ghostypaperrecorder.model.PlayerInfo;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.entity.Chicken;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Sheep;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -20,6 +23,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.UUID;
 
 public final class RecordingSession {
@@ -29,6 +33,7 @@ public final class RecordingSession {
     private static final int FLAG_INVISIBLE = 5;
     private static final int FLAG_GLIDING = 32;
     private static final int FLAG_SWIMMING = 56;
+    private static final int ANIMATE_SWING_ARM = 1;
 
     private final Plugin plugin;
     private final PaperItemMapper itemMapper;
@@ -36,6 +41,7 @@ public final class RecordingSession {
     private final Path outputFile;
     private final String recordName;
     private final Map<UUID, PlayerRecording> players = new LinkedHashMap<>();
+    private final EntityIdMapper entityIdMapper = new EntityIdMapper();
     private final List<PlayerInfo> playerInfo = new ArrayList<>();
     private final BukkitTask task;
     private String worldName = "paper";
@@ -60,13 +66,22 @@ public final class RecordingSession {
         tick++;
     }
 
-    public void recordAttack(Player attacker, Player target) {
+    public void recordSwing(Player player) {
         if (stopped) {
             return;
         }
-        PlayerRecording attackerRecording = playerRecording(attacker);
-        PlayerRecording targetRecording = playerRecording(target);
-        attackerRecording.recordAttack(tick, targetRecording.originEntityId());
+        playerRecording(player).recordAnimate(tick, ANIMATE_SWING_ARM, 0.0f);
+    }
+
+    public void recordAttack(Player attacker, Entity target) {
+        if (stopped) {
+            return;
+        }
+        OptionalLong targetId = targetEntityId(target);
+        if (targetId.isEmpty()) {
+            return;
+        }
+        playerRecording(attacker).recordAttack(tick, targetId.getAsLong());
     }
 
     public Path stopAndSave() throws IOException {
@@ -75,6 +90,7 @@ public final class RecordingSession {
         }
         stopped = true;
         task.cancel();
+        forceFinalSnapshots();
         Files.createDirectories(outputFile.getParent());
         PlaybackMetadata metadata = PlaybackMetadata.create(recordName, worldName, playerInfo);
         try (OutputStream outputStream = Files.newOutputStream(outputFile)) {
@@ -101,6 +117,34 @@ public final class RecordingSession {
 
     public Path outputFile() {
         return outputFile;
+    }
+
+    long mappedEntityIdForTest(Entity entity) {
+        return nonPlayerEntityId(entity);
+    }
+
+    private void forceFinalSnapshots() {
+        int finalTick = Math.max(1, tick);
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            PlayerRecording recording = players.get(player.getUniqueId());
+            if (recording != null) {
+                recording.forceRecord(finalTick, snapshot(player));
+            }
+        }
+    }
+
+    private OptionalLong targetEntityId(Entity entity) {
+        if (entity instanceof Player player) {
+            return OptionalLong.of(playerRecording(player).originEntityId());
+        }
+        if (entity instanceof Chicken || entity instanceof Sheep) {
+            return OptionalLong.of(nonPlayerEntityId(entity));
+        }
+        return OptionalLong.empty();
+    }
+
+    private long nonPlayerEntityId(Entity entity) {
+        return entityIdMapper.id(entity.getUniqueId());
     }
 
     private PlayerRecording playerRecording(Player player) {

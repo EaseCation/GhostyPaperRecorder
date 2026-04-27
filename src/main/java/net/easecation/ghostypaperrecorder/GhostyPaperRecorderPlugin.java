@@ -6,6 +6,8 @@ import net.easecation.ghostypaperrecorder.recording.PaperItemMapper;
 import net.easecation.ghostypaperrecorder.recording.RecordingSession;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerAnimationEvent;
+import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -47,14 +49,26 @@ public final class GhostyPaperRecorderPlugin extends JavaPlugin implements Liste
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player target)) {
+        if (!(event.getDamager() instanceof Player attacker)) {
             return;
         }
         RecordingSession activeSession = session;
         if (activeSession == null || activeSession.isStopped()) {
             return;
         }
-        activeSession.recordAttack(attacker, target);
+        activeSession.recordAttack(attacker, event.getEntity());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerAnimation(PlayerAnimationEvent event) {
+        if (event.getAnimationType() != PlayerAnimationType.ARM_SWING) {
+            return;
+        }
+        RecordingSession activeSession = session;
+        if (activeSession == null || activeSession.isStopped()) {
+            return;
+        }
+        activeSession.recordSwing(event.getPlayer());
     }
 
     public boolean isRecording() {

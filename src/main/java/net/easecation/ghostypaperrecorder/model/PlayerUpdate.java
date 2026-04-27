@@ -5,7 +5,7 @@ import net.easecation.ghostypaperrecorder.format.GhostyConstants;
 import net.easecation.ghostypaperrecorder.format.GhostyItemNbt;
 
 public sealed interface PlayerUpdate permits PlayerUpdate.Position, PlayerUpdate.Rotation, PlayerUpdate.TagName,
-        PlayerUpdate.DataFlags, PlayerUpdate.ItemUpdate, PlayerUpdate.Ping, PlayerUpdate.Attack {
+        PlayerUpdate.DataFlags, PlayerUpdate.ItemUpdate, PlayerUpdate.Animate, PlayerUpdate.Ping, PlayerUpdate.Attack {
     int typeId();
 
     void writePayload(GhostyBinaryWriter writer, GhostyItemNbt itemNbt);
@@ -65,6 +65,19 @@ public sealed interface PlayerUpdate permits PlayerUpdate.Position, PlayerUpdate
         @Override
         public void writePayload(GhostyBinaryWriter writer, GhostyItemNbt itemNbt) {
             writer.writeByteArray(itemNbt.write(item));
+        }
+    }
+
+    record Animate(int action, float rowingTime) implements PlayerUpdate {
+        @Override
+        public int typeId() {
+            return GhostyConstants.PLAYER_UPDATE_ANIMATE;
+        }
+
+        @Override
+        public void writePayload(GhostyBinaryWriter writer, GhostyItemNbt itemNbt) {
+            writer.writeInt(action);
+            writer.writeFloat(rowingTime);
         }
     }
 

@@ -11,9 +11,10 @@ The first version intentionally records only player-focused anti-cheat evidence:
 - Main hand, offhand, and armor slots
 - Basic Bedrock-compatible data flags: on fire, sneaking, sprinting, invisible, gliding, swimming
 - Player ping
-- Successful player-vs-player hits from `EntityDamageByEntityEvent`
+- Arm swing animations from `PlayerAnimationEvent`
+- Successful hits from `EntityDamageByEntityEvent` against players, chickens, and sheep
 
-It does not record blocks, projectiles, drops, sounds, particles, empty swings, or world packet effects.
+It does not record blocks, projectiles, drops, sounds, particles, or world packet effects. Empty swings are represented as arm swing animation updates.
 
 ## Build
 
@@ -61,7 +62,7 @@ The pack contains:
 - `player/player_record_{index}_{name}.ecrecp`
 - `metadata.json`
 
-The level record is intentionally minimal and only keeps the Nukkit Ghosty playback timeline alive.
+The level record is intentionally minimal and only keeps the Nukkit Ghosty playback timeline alive. Non-player hit targets are currently ID-mapped for attack payloads only; they are not emitted as `entity/*.ecrece` records.
 
 ## Compatibility Notes
 
