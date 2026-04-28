@@ -21,6 +21,7 @@ dependencies {
     implementation("org.apache.commons:commons-compress:1.27.1")
     implementation("com.github.luben:zstd-jni:1.5.6-9")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
+    testImplementation("com.google.code.gson:gson:2.11.0")
 }
 
 tasks.processResources {

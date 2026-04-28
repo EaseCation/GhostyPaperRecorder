@@ -37,35 +37,19 @@ public final class GhostyBinaryWriter {
     }
 
     public void writeUnsignedVarInt(long value) {
-        long remaining = value & 0xffffffffL;
-        do {
-            int temp = (int) (remaining & 0x7f);
-            remaining >>>= 7;
-            if (remaining != 0) {
-                temp |= 0x80;
-            }
-            writeByte(temp);
-        } while (remaining != 0);
+        writeInt((int) value);
     }
 
     public void writeVarInt(int value) {
-        writeUnsignedVarInt((((long) value << 1) ^ (value >> 31)) & 0xffffffffL);
+        writeInt(value);
     }
 
     public void writeUnsignedVarLong(long value) {
-        long remaining = value;
-        do {
-            int temp = (int) (remaining & 0x7f);
-            remaining >>>= 7;
-            if (remaining != 0) {
-                temp |= 0x80;
-            }
-            writeByte(temp);
-        } while (remaining != 0);
+        writeLong(value);
     }
 
     public void writeVarLong(long value) {
-        writeUnsignedVarLong((value << 1) ^ (value >> 63));
+        writeLong(value);
     }
 
     public void writeFloat(float value) {

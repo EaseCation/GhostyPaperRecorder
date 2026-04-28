@@ -6,9 +6,6 @@ import net.easecation.ghostypaperrecorder.recording.PlayerRecording;
 import net.easecation.ghostypaperrecorder.recording.PlayerSnapshot;
 import org.junit.jupiter.api.Test;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,7 +16,7 @@ class PlayerRecordWriterTest {
         recording.recordAnimate(7, 1, 0.0f);
 
         byte[] bytes = new GhostyRecordWriter().writePlayerRecord(recording);
-        Reader reader = new Reader(bytes);
+        LittleEndianRecordReader reader = new LittleEndianRecordReader(bytes);
         assertEquals(GhostyConstants.PLAYER_RECORD_SKINLESS_V3, reader.u8());
         assertEquals(0, reader.i32());
         assertEquals("Alex", reader.string());
@@ -38,7 +35,7 @@ class PlayerRecordWriterTest {
         recording.recordAttack(8, 123456789L);
 
         byte[] bytes = new GhostyRecordWriter().writePlayerRecord(recording);
-        Reader reader = new Reader(bytes);
+        LittleEndianRecordReader reader = new LittleEndianRecordReader(bytes);
         assertEquals(GhostyConstants.PLAYER_RECORD_SKINLESS_V3, reader.u8());
         assertEquals(0, reader.i32());
         assertEquals("Alex", reader.string());
@@ -47,6 +44,63 @@ class PlayerRecordWriterTest {
         assertEquals(8, reader.unsignedVarInt());
         assertEquals(GhostyConstants.PLAYER_UPDATE_ATTACK, reader.u8());
         assertEquals(123456789L, reader.unsignedVarLong());
+        assertEquals(bytes.length, reader.offset());
+    }
+
+    @Test
+    void writesSnapshotUpdatesWithGhostyLittleEndianPayloads() {
+        PlayerRecording recording = new PlayerRecording("Steve", 0x0102030405060708L, 0);
+        PlayerSnapshot snapshot = new PlayerSnapshot(
+                1.25, 64.0, -3.5,
+                180.0, 30.0,
+                "Steve",
+                new GhostyItem("minecraft:diamond_sword", 0, 1),
+                GhostyItem.AIR,
+                GhostyItem.AIR,
+                GhostyItem.AIR,
+                GhostyItem.AIR,
+                GhostyItem.AIR,
+                123L,
+                45
+        );
+        recording.record(20, snapshot);
+
+        byte[] bytes = new GhostyRecordWriter().writePlayerRecord(recording);
+        LittleEndianRecordReader reader = new LittleEndianRecordReader(bytes);
+        assertEquals(GhostyConstants.PLAYER_RECORD_SKINLESS_V3, reader.u8());
+        assertEquals(0, reader.i32());
+        assertEquals("Steve", reader.string());
+        assertEquals(0x0102030405060708L, reader.unsignedVarLong());
+        assertEquals(11, reader.unsignedVarInt());
+
+        assertEquals(20, reader.unsignedVarInt());
+        assertEquals(GhostyConstants.PLAYER_UPDATE_POSITION_XYZ, reader.u8());
+        assertEquals(1.25f, reader.f32());
+        assertEquals(64.0f, reader.f32());
+        assertEquals(-3.5f, reader.f32());
+
+        assertEquals(20, reader.unsignedVarInt());
+        assertEquals(GhostyConstants.PLAYER_UPDATE_ROTATION, reader.u8());
+        assertEquals(180.0f, reader.f32());
+        assertEquals(30.0f, reader.f32());
+
+        assertEquals(20, reader.unsignedVarInt());
+        assertEquals(GhostyConstants.PLAYER_UPDATE_TAG_NAME, reader.u8());
+        assertEquals("Steve", reader.string());
+
+        for (int typeId = GhostyConstants.PLAYER_UPDATE_ITEM; typeId <= GhostyConstants.PLAYER_UPDATE_OFFHAND; typeId++) {
+            assertEquals(20, reader.unsignedVarInt());
+            assertEquals(typeId, reader.u8());
+            assertTrue(reader.byteArray().length > 0);
+        }
+
+        assertEquals(20, reader.unsignedVarInt());
+        assertEquals(GhostyConstants.PLAYER_UPDATE_DATA_FLAGS, reader.u8());
+        assertEquals(123L, reader.varLong());
+
+        assertEquals(20, reader.unsignedVarInt());
+        assertEquals(GhostyConstants.PLAYER_UPDATE_PING, reader.u8());
+        assertEquals(45, reader.unsignedVarInt());
         assertEquals(bytes.length, reader.offset());
     }
 
@@ -73,68 +127,5 @@ class PlayerRecordWriterTest {
         assertTrue(recording.updates().size() > before);
         assertTrue(recording.updates().stream().anyMatch(update -> update.tick() == 100 && update.update() instanceof PlayerUpdate.Position));
         assertTrue(recording.updates().stream().anyMatch(update -> update.tick() == 100 && update.update() instanceof PlayerUpdate.Rotation));
-    }
-
-    private static final class Reader {
-        private final byte[] bytes;
-        private int offset;
-
-        private Reader(byte[] bytes) {
-            this.bytes = bytes;
-        }
-
-        private int u8() {
-            return bytes[offset++] & 0xff;
-        }
-
-        private int i32() {
-            int value = ByteBuffer.wrap(bytes, offset, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
-            offset += 4;
-            return value;
-        }
-
-        private float f32() {
-            float value = ByteBuffer.wrap(bytes, offset, 4).order(ByteOrder.LITTLE_ENDIAN).getFloat();
-            offset += 4;
-            return value;
-        }
-
-        private String string() {
-            int length = (int) unsignedVarInt();
-            String value = new String(bytes, offset, length, java.nio.charset.StandardCharsets.UTF_8);
-            offset += length;
-            return value;
-        }
-
-        private int varInt() {
-            long encoded = unsignedVarInt();
-            return (int) (encoded >> 1) ^ -(int) (encoded & 1);
-        }
-
-        private long unsignedVarInt() {
-            return unsignedVar(5);
-        }
-
-        private long unsignedVarLong() {
-            return unsignedVar(10);
-        }
-
-        private long unsignedVar(int maxBytes) {
-            long value = 0;
-            int size = 0;
-            int b;
-            do {
-                b = u8();
-                value |= (long) (b & 0x7f) << (size++ * 7);
-                if (size > maxBytes) {
-                    throw new IllegalArgumentException("varint too large");
-                }
-            } while ((b & 0x80) == 0x80);
-            return value;
-        }
-
-        private int offset() {
-            return offset;
-        }
     }
 }
