@@ -6,6 +6,8 @@ import net.easecation.ghostypaperrecorder.api.RecordingStatus;
 import net.easecation.ghostypaperrecorder.api.RecordingStopResult;
 import net.easecation.ghostypaperrecorder.format.GhostyBinaryWriter;
 import net.easecation.ghostypaperrecorder.format.GhostyPackWriter;
+import net.easecation.ghostypaperrecorder.model.LevelCustomEvent;
+import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Chicken;
@@ -45,7 +47,9 @@ public final class RecordingSession {
     private final Path outputFile;
     private final String recordName;
     private final Set<UUID> participants;
+    private final Map<UUID, RecordingPlayerInfo> playerIdentities;
     private final Map<UUID, PlayerRecording> players = new LinkedHashMap<>();
+    private final List<LevelCustomEvent> customEvents = new ArrayList<>();
     private final EntityIdMapper entityIdMapper = new EntityIdMapper();
     private final BukkitTask task;
     private RecordingMetadata metadata;
@@ -56,12 +60,19 @@ public final class RecordingSession {
 
     public RecordingSession(Plugin plugin, PaperItemMapper itemMapper, GhostyPackWriter packWriter, String sessionId,
                             Path outputFile, String recordName, Set<UUID> participants, RecordingMetadata metadata) {
+        this(plugin, itemMapper, packWriter, sessionId, outputFile, recordName, participants, metadata, Map.of());
+    }
+
+    public RecordingSession(Plugin plugin, PaperItemMapper itemMapper, GhostyPackWriter packWriter, String sessionId,
+                            Path outputFile, String recordName, Set<UUID> participants, RecordingMetadata metadata,
+                            Map<UUID, RecordingPlayerInfo> playerIdentities) {
         this.itemMapper = itemMapper;
         this.packWriter = packWriter;
         this.sessionId = sessionId;
         this.outputFile = outputFile;
         this.recordName = recordName;
         this.participants = new LinkedHashSet<>(participants);
+        this.playerIdentities = playerIdentities == null ? Map.of() : Map.copyOf(playerIdentities);
         this.metadata = metadata;
         this.task = Bukkit.getScheduler().runTaskTimer(plugin, this::recordTick, 1L, 1L);
     }
@@ -97,6 +108,13 @@ public final class RecordingSession {
         playerRecording(attacker).recordAttack(tick, targetId.getAsLong());
     }
 
+    public void recordCustomEvent(JsonObject event) {
+        if (stopped || event == null) {
+            return;
+        }
+        customEvents.add(new LevelCustomEvent(tick, event.deepCopy()));
+    }
+
     public RecordingStopResult stopAndSave() throws IOException {
         if (stopped) {
             return stopResult;
@@ -108,7 +126,7 @@ public final class RecordingSession {
         List<String> recordedNames = recordedPlayerNames();
         RecordingMetadata finalMetadata = finalMetadata(recordedNames);
         try (OutputStream outputStream = Files.newOutputStream(outputFile)) {
-            packWriter.write(outputStream, Math.max(1, tick), players.values(), finalMetadata);
+            packWriter.write(outputStream, Math.max(1, tick), players.values(), finalMetadata, List.copyOf(customEvents));
         }
         stopResult = new RecordingStopResult(sessionId, recordName, outputFile, Math.max(1, tick), recordedNames, finalMetadata);
         return stopResult;
@@ -235,7 +253,8 @@ public final class RecordingSession {
     }
 
     private PlayerRecording playerRecording(Player player) {
-        return players.computeIfAbsent(player.getUniqueId(), uuid -> new PlayerRecording(player.getName(), GhostyBinaryWriter.stableEntityId(uuid), 0));
+        return players.computeIfAbsent(player.getUniqueId(),
+                uuid -> new PlayerRecording(recordedPlayerName(player), GhostyBinaryWriter.stableEntityId(uuid), 0));
     }
 
     private PlayerSnapshot snapshot(Player player) {
@@ -246,7 +265,7 @@ public final class RecordingSession {
                 player.getLocation().getZ(),
                 player.getLocation().getYaw(),
                 player.getLocation().getPitch(),
-                player.getName(),
+                displayPlayerName(player),
                 itemMapper.map(inventory.getItemInMainHand()),
                 itemMapper.map(inventory.getHelmet()),
                 itemMapper.map(inventory.getChestplate()),
@@ -256,6 +275,25 @@ public final class RecordingSession {
                 flags(player),
                 player.getPing()
         );
+    }
+
+    private String recordedPlayerName(Player player) {
+        RecordingPlayerInfo identity = playerIdentity(player);
+        return isBlank(identity.name()) ? player.getName() : identity.name();
+    }
+
+    private String displayPlayerName(Player player) {
+        RecordingPlayerInfo identity = playerIdentity(player);
+        return isBlank(identity.aliasName()) ? player.getName() : identity.aliasName();
+    }
+
+    private RecordingPlayerInfo playerIdentity(Player player) {
+        RecordingPlayerInfo identity = playerIdentities.get(player.getUniqueId());
+        return identity == null ? RecordingPlayerInfo.of(player.getName(), player.getName()) : identity;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private static long flags(Player player) {

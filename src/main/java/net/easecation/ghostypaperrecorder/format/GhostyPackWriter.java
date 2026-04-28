@@ -1,6 +1,7 @@
 package net.easecation.ghostypaperrecorder.format;
 
 import net.easecation.ghostypaperrecorder.api.RecordingMetadata;
+import net.easecation.ghostypaperrecorder.model.LevelCustomEvent;
 import net.easecation.ghostypaperrecorder.recording.PlayerRecording;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -10,15 +11,21 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.List;
 
 public final class GhostyPackWriter {
     private final GhostyRecordWriter recordWriter = new GhostyRecordWriter();
     private final JsonUtil jsonUtil = new JsonUtil();
 
     public void write(OutputStream outputStream, int lastTick, Collection<PlayerRecording> players, RecordingMetadata metadata) throws IOException {
+        write(outputStream, lastTick, players, metadata, List.of());
+    }
+
+    public void write(OutputStream outputStream, int lastTick, Collection<PlayerRecording> players, RecordingMetadata metadata,
+                      List<LevelCustomEvent> customEvents) throws IOException {
         try (TarArchiveOutputStream tar = new TarArchiveOutputStream(new ZstdCompressorOutputStream(outputStream, 19))) {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-            insert(tar, "level_record.ecrecl", recordWriter.writeLevelRecord(lastTick));
+            insert(tar, "level_record.ecrecl", recordWriter.writeLevelRecord(lastTick, customEvents));
             int index = 0;
             for (PlayerRecording player : players) {
                 insert(tar, "player/player_record_" + index + "_" + safeName(player.playerName()) + ".ecrecp", recordWriter.writePlayerRecord(player));

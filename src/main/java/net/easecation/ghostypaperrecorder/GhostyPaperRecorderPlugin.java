@@ -1,5 +1,6 @@
 package net.easecation.ghostypaperrecorder;
 
+import com.google.gson.JsonObject;
 import net.easecation.ghostypaperrecorder.api.GhostyRecorderApi;
 import net.easecation.ghostypaperrecorder.api.RecordingMetadata;
 import net.easecation.ghostypaperrecorder.api.RecordingStartRequest;
@@ -111,7 +112,7 @@ public final class GhostyPaperRecorderPlugin extends JavaPlugin implements Liste
             throw new IOException("Recording file already exists: " + output);
         }
         RecordingSession session = new RecordingSession(this, itemMapper, packWriter, sessionId, output, recordName,
-                request.participants(), request.metadata());
+                request.participants(), request.metadata(), request.playerIdentities());
         sessions.put(sessionId, session);
         return session.status();
     }
@@ -160,6 +161,12 @@ public final class GhostyPaperRecorderPlugin extends JavaPlugin implements Liste
     public void mergeMetadata(String sessionId, RecordingMetadata metadata) {
         requirePrimaryThread();
         sessionOrThrow(sessionId).mergeMetadata(metadata);
+    }
+
+    @Override
+    public void recordCustomEvent(String sessionId, JsonObject event) {
+        requirePrimaryThread();
+        sessionOrThrow(sessionId).recordCustomEvent(event);
     }
 
     public boolean isRecording() {

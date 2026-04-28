@@ -57,7 +57,7 @@ public sealed interface PlayerUpdate permits PlayerUpdate.Position, PlayerUpdate
 
         @Override
         public void writePayload(GhostyBinaryWriter writer, GhostyItemNbt itemNbt) {
-            writer.writeLong(flags);
+            writer.writeVarLong(flags);
         }
     }
 
@@ -76,7 +76,7 @@ public sealed interface PlayerUpdate permits PlayerUpdate.Position, PlayerUpdate
 
         @Override
         public void writePayload(GhostyBinaryWriter writer, GhostyItemNbt itemNbt) {
-            writer.writeInt(action);
+            writer.writeVarInt(action);
             writer.writeFloat(rowingTime);
         }
     }
@@ -89,7 +89,7 @@ public sealed interface PlayerUpdate permits PlayerUpdate.Position, PlayerUpdate
 
         @Override
         public void writePayload(GhostyBinaryWriter writer, GhostyItemNbt itemNbt) {
-            writer.writeInt(value);
+            writer.writeUnsignedVarInt(value);
         }
     }
 

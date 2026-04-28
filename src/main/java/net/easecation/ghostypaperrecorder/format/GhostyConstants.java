@@ -2,6 +2,7 @@ package net.easecation.ghostypaperrecorder.format;
 
 public final class GhostyConstants {
     public static final int LEVEL_VERSION_2 = 2;
+    public static final int LEVEL_UPDATE_CUSTOM_EVENT = 11;
     public static final int LEVEL_UPDATE_TIME = 12;
 
     public static final int PLAYER_RECORD_SKINLESS_V3 = 6;

@@ -1,5 +1,7 @@
 package net.easecation.ghostypaperrecorder.api;
 
+import com.google.gson.JsonObject;
+
 import java.io.IOException;
 import java.util.Collection;
 
@@ -17,4 +19,6 @@ public interface GhostyRecorderApi {
     void setMetadata(String sessionId, RecordingMetadata metadata);
 
     void mergeMetadata(String sessionId, RecordingMetadata metadata);
+
+    void recordCustomEvent(String sessionId, JsonObject event);
 }
