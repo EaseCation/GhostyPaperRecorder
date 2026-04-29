@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.UUID;
 
 public interface GhostyRecorderApi {
     RecordingStatus startRecording(RecordingStartRequest request) throws IOException;
@@ -15,6 +16,8 @@ public interface GhostyRecorderApi {
     Collection<RecordingStatus> activeSessions();
 
     boolean isRecording(String sessionId);
+
+    RecordingStatus addParticipant(String sessionId, UUID participant, RecordingPlayerInfo playerInfo);
 
     void setMetadata(String sessionId, RecordingMetadata metadata);
 

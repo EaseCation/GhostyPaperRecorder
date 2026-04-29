@@ -3,6 +3,7 @@ package net.easecation.ghostypaperrecorder;
 import com.google.gson.JsonObject;
 import net.easecation.ghostypaperrecorder.api.GhostyRecorderApi;
 import net.easecation.ghostypaperrecorder.api.RecordingMetadata;
+import net.easecation.ghostypaperrecorder.api.RecordingPlayerInfo;
 import net.easecation.ghostypaperrecorder.api.RecordingStartRequest;
 import net.easecation.ghostypaperrecorder.api.RecordingStatus;
 import net.easecation.ghostypaperrecorder.api.RecordingStopResult;
@@ -149,6 +150,12 @@ public final class GhostyPaperRecorderPlugin extends JavaPlugin implements Liste
         requirePrimaryThread();
         RecordingSession session = sessions.get(safeId(sessionId, MANUAL_SESSION_ID));
         return session != null && !session.isStopped();
+    }
+
+    @Override
+    public RecordingStatus addParticipant(String sessionId, UUID participant, RecordingPlayerInfo playerInfo) {
+        requirePrimaryThread();
+        return sessionOrThrow(sessionId).addParticipant(participant, playerInfo);
     }
 
     @Override

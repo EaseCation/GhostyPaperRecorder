@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
@@ -72,7 +73,7 @@ public final class RecordingSession {
         this.outputFile = outputFile;
         this.recordName = recordName;
         this.participants = new LinkedHashSet<>(participants);
-        this.playerIdentities = playerIdentities == null ? Map.of() : Map.copyOf(playerIdentities);
+        this.playerIdentities = playerIdentities == null ? new LinkedHashMap<>() : new LinkedHashMap<>(playerIdentities);
         this.metadata = metadata;
         this.task = Bukkit.getScheduler().runTaskTimer(plugin, this::recordTick, 1L, 1L);
     }
@@ -134,6 +135,18 @@ public final class RecordingSession {
 
     public RecordingStatus status() {
         return new RecordingStatus(sessionId, recordName, outputFile, tick, players.size(), participants);
+    }
+
+    public RecordingStatus addParticipant(UUID participant, RecordingPlayerInfo playerInfo) {
+        if (stopped) {
+            throw new IllegalStateException("Recording session has already stopped: " + sessionId);
+        }
+        Objects.requireNonNull(participant, "participant");
+        participants.add(participant);
+        if (playerInfo != null) {
+            playerIdentities.put(participant, playerInfo);
+        }
+        return status();
     }
 
     public void setMetadata(RecordingMetadata metadata) {
