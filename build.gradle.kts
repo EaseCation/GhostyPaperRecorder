@@ -1,5 +1,6 @@
 plugins {
-    java
+    `java-library`
+    `maven-publish`
     id("com.gradleup.shadow") version "8.3.5"
 }
 
@@ -34,6 +35,14 @@ tasks.processResources {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
 }
 
 tasks.shadowJar {
